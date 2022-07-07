@@ -1,54 +1,138 @@
-
-
+#include <cstdio>
 #include <iostream>
+
+#include "src/utility.hpp"
 
 // Includes common necessary includes for development using depthai library
 #include "depthai/depthai.hpp"
 
-// Include OpenCV
-#include <opencv2/opencv.hpp>
+// Optional. If set (true), the ColorCamera is downscaled from 1080p to 720p.
+// Otherwise (false), the aligned depth is automatically upscaled to 1080p
+static std::atomic<bool> downscaleColor{true};
+static constexpr int fps = 30;
+// The disparity is computed at this resolution, then upscaled to RGB resolution
+static constexpr auto monoRes = dai::MonoCameraProperties::SensorResolution::THE_400_P;
+
+static float rgbWeight = 0.6f;
+static float depthWeight = 0.4f;
+
+static void updateBlendWeights(int percentRgb, void* ctx) {
+    rgbWeight = float(percentRgb) / 100.f;
+    depthWeight = 1.f - rgbWeight;
+}
 
 int main() {
+    using namespace std;
+
     // Create pipeline
     dai::Pipeline pipeline;
+    std::vector<std::string> queueNames;
 
-    // Define source and outputs
+    // Define sources and outputs
     auto camRgb = pipeline.create<dai::node::ColorCamera>();
-    auto xoutVideo = pipeline.create<dai::node::XLinkOut>();
-    auto xoutPreview = pipeline.create<dai::node::XLinkOut>();
+    auto left = pipeline.create<dai::node::MonoCamera>();
+    auto right = pipeline.create<dai::node::MonoCamera>();
+    auto stereo = pipeline.create<dai::node::StereoDepth>();
 
-    xoutVideo->setStreamName("video");
-    xoutPreview->setStreamName("preview");
+    auto rgbOut = pipeline.create<dai::node::XLinkOut>();
+    auto depthOut = pipeline.create<dai::node::XLinkOut>();
+
+    rgbOut->setStreamName("rgb");
+    queueNames.push_back("rgb");
+    depthOut->setStreamName("depth");
+    queueNames.push_back("depth");
 
     // Properties
-    camRgb->setPreviewSize(300, 300);
     camRgb->setBoardSocket(dai::CameraBoardSocket::RGB);
     camRgb->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
-    camRgb->setInterleaved(true);
-    camRgb->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
+    camRgb->setFps(fps);
+    if(downscaleColor) camRgb->setIspScale(2, 3);
+    // For now, RGB needs fixed focus to properly align with depth.
+    // This value was used during calibration
+    camRgb->initialControl.setManualFocus(135);
+
+    left->setResolution(monoRes);
+    left->setBoardSocket(dai::CameraBoardSocket::LEFT);
+    left->setFps(fps);
+    right->setResolution(monoRes);
+    right->setBoardSocket(dai::CameraBoardSocket::RIGHT);
+    right->setFps(fps);
+
+    //stereo->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
+    // LR-check is required for depth alignment
+    stereo->setLeftRightCheck(true);
+    stereo->setDepthAlign(dai::CameraBoardSocket::RGB);
 
     // Linking
-    camRgb->video.link(xoutVideo->input);
-    camRgb->preview.link(xoutPreview->input);
+    camRgb->isp.link(rgbOut->input);
+    left->out.link(stereo->left);
+    right->out.link(stereo->right);
+    stereo->disparity.link(depthOut->input);
 
     // Connect to device and start pipeline
     dai::Device device(pipeline);
 
-    auto video = device.getOutputQueue("video");
-    auto preview = device.getOutputQueue("preview");
+    // Sets queues size and behavior
+    for(const auto& name : queueNames) {
+        device.getOutputQueue(name, 4, false);
+    }
+
+    std::unordered_map<std::string, cv::Mat> frame;
+
+    auto rgbWindowName = "rgb";
+    auto depthWindowName = "depth";
+    auto blendedWindowName = "rgb-depth";
+    cv::namedWindow(rgbWindowName);
+    cv::namedWindow(depthWindowName);
+    cv::namedWindow(blendedWindowName);
+    int defaultValue = (int)(rgbWeight * 100);
+    cv::createTrackbar("RGB Weight %", blendedWindowName, &defaultValue, 100, updateBlendWeights);
 
     while(true) {
-        auto videoFrame = video->get<dai::ImgFrame>();
-        auto previewFrame = preview->get<dai::ImgFrame>();
+        std::unordered_map<std::string, std::shared_ptr<dai::ImgFrame>> latestPacket;
 
-        // Get BGR frame from NV12 encoded video frame to show with opencv
-        cv::imshow("video", videoFrame->getCvFrame());
+        auto queueEvents = device.getQueueEvents(queueNames);
+        for(const auto& name : queueEvents) {
+            auto packets = device.getOutputQueue(name)->tryGetAll<dai::ImgFrame>();
+            auto count = packets.size();
+            if(count > 0) {
+                latestPacket[name] = packets[count - 1];
+            }
+        }
 
-        // Show 'preview' frame as is (already in correct format, no copy is made)
-        cv::imshow("preview", previewFrame->getFrame());
+        for(const auto& name : queueNames) {
+            if(latestPacket.find(name) != latestPacket.end()) {
+                if(name == depthWindowName) {
+                    frame[name] = latestPacket[name]->getFrame();
+                    auto maxDisparity = stereo->initialConfig.getMaxDisparity();
+                    // Optional, extend range 0..95 -> 0..255, for a better visualisation
+                    if(1) frame[name].convertTo(frame[name], CV_8UC1, 255. / maxDisparity);
+                    // Optional, apply false colorization
+                    if(1) cv::applyColorMap(frame[name], frame[name], cv::COLORMAP_HOT);
+                } else {
+                    frame[name] = latestPacket[name]->getCvFrame();
+                }
+
+                cv::imshow(name, frame[name]);
+            }
+        }
+
+        // Blend when both received
+        if(frame.find(rgbWindowName) != frame.end() && frame.find(depthWindowName) != frame.end()) {
+            // Need to have both frames in BGR format before blending
+            if(frame[depthWindowName].channels() < 3) {
+                cv::cvtColor(frame[depthWindowName], frame[depthWindowName], cv::COLOR_GRAY2BGR);
+            }
+            cv::Mat blended;
+            cv::addWeighted(frame[rgbWindowName], rgbWeight, frame[depthWindowName], depthWeight, 0, blended);
+            cv::imshow(blendedWindowName, blended);
+            frame.clear();
+        }
 
         int key = cv::waitKey(1);
-        if(key == 'q' || key == 'Q') return 0;
+        if(key == 'q' || key == 'Q') {
+            return 0;
+        }
     }
     return 0;
 }

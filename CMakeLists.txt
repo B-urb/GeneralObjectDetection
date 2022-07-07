@@ -1,9 +1,25 @@
 cmake_minimum_required(VERSION 3.21)
-project(CPP3D)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(CPP3D main.cpp)
+
+
+
+set(TARGET_NAME CPP3D)
+project(${TARGET_NAME})
+find_package(realsense2 REQUIRED)
+if(WIN32)
+    find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/CMake)
+else()
+    find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/lib/CMake)
+    list(APPEND Open3D_LIBRARIES dl)
+endif()
+
+
+find_package(OpenCV REQUIRED )
+find_package(depthai CONFIG REQUIRED)
+
+#find_package(depthai CONFIG REQUIRED)
 #find_package(OpenGL REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(OpenCV REQUIRED )
@@ -15,17 +31,21 @@ find_package(OpenCV REQUIRED )
 #endif()
 
 
-find_package(realsense2 REQUIRED)
-if(WIN32)
-    find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/CMake)
-else()
-    find_package(Open3D HINTS ${CMAKE_INSTALL_PREFIX}/lib/CMake)
-    list(APPEND Open3D_LIBRARIES dl)
-endif()
-
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 link_directories(${Open3D_LIBRARY_DIRS})
 
-target_link_libraries(CPP3D  glfw ${OpenCV_LIBS} ${realsense2_LIBRARY} ${Open3D_LIBRARIES})
-target_include_directories(CPP3D PUBLIC ${Open3D_INCLUDE_DIRS})
+
+#set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+#set_property(TARGET ${TARGET_NAME} PROPERTY CXX_EXTENSIONS OFF)
+
+
+
+add_executable(${TARGET_NAME} main.cpp src/utility.cpp src/utility.hpp src/Processing.cpp src/Processing.h src/RealSenseCamera.cpp src/RealSenseCamera.h src/DepthAiCamera.cpp src/DepthAiCamera.h)
+
+target_link_libraries(${TARGET_NAME} depthai::opencv)
+
+target_link_libraries(${TARGET_NAME} glfw ${OpenCV_LIBS} ${realsense2_LIBRARY} ${Open3D_LIBRARIES})
+target_include_directories(${TARGET_NAME} PUBLIC ${Open3D_INCLUDE_DIRS})
+
+
