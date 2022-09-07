@@ -2,7 +2,7 @@
 #include <iostream>
 #include "src/DepthAiCamera.h"
 #include "src/utility.hpp"
-#include "open3d/Open3D.hpp"
+#include "open3d/Open3D.h"
 
 // Includes common necessary includes for development using depthai library
 #include "depthai/depthai.hpp"
@@ -28,7 +28,8 @@ int main() {
   dc.startCamera();
   vector<Eigen::Vector3d> points;
   vector<Eigen::Vector3d> colors;
-  auto pc = open3d::
+  auto pc = std::make_shared<open3d::geometry::PointCloud>(open3d::geometry::PointCloud{});
+
   while(true) {
       auto success = dc.getNextFrame(points, colors);
       if(success) {
@@ -37,6 +38,10 @@ int main() {
       else {
           std::cout << "False" << std::endl;
       }
+      open3d::geometry::PointCloud pointCloud{};
+      pc->points_.resize(points.size());
+      //pc_pointer->colors_.resize(colors.size());
+      pc->points_ = points;
 
 
   }
