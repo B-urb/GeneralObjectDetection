@@ -1,7 +1,8 @@
 #include <cstdio>
 #include <iostream>
-
+#include "src/DepthAiCamera.h"
 #include "src/utility.hpp"
+#include "open3d/Open3D.hpp"
 
 // Includes common necessary includes for development using depthai library
 #include "depthai/depthai.hpp"
@@ -23,8 +24,26 @@ static void updateBlendWeights(int percentRgb, void* ctx) {
 
 int main() {
     using namespace std;
+    auto dc = DepthAiCamera();
+  dc.startCamera();
+  vector<Eigen::Vector3d> points;
+  vector<Eigen::Vector3d> colors;
+  auto pc = open3d::
+  while(true) {
+      auto success = dc.getNextFrame(points, colors);
+      if(success) {
+          std::cout << points.at(0) << std::endl;
+      }
+      else {
+          std::cout << "False" << std::endl;
+      }
+
+
+  }
+
 
     // Create pipeline
+/*
     dai::Pipeline pipeline;
     std::vector<std::string> queueNames;
 
@@ -134,5 +153,6 @@ int main() {
             return 0;
         }
     }
+*/
     return 0;
 }

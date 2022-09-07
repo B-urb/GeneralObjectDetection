@@ -9,9 +9,8 @@
 #include "Eigen/Dense"
 #include <iostream>
 #include "opencv2/opencv.hpp"
-#include "StereoCamera.h"
 
-class RealSenseCamera : public StereoCamera {
+class RealSenseCamera {
 
 public:
     RealSenseCamera(bool use_framequeue = false, bool use_align = false);

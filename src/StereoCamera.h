@@ -4,7 +4,10 @@
 
 #ifndef CPP3D_STEREOCAMERA_H
 #define CPP3D_STEREOCAMERA_H
-
+#include <librealsense2/rs.hpp>
+#include <librealsense2/rsutil.h>
+#include "Eigen/Dense"
+#include <iostream>
 
 class StereoCamera {
 
