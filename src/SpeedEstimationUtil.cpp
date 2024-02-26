@@ -50,7 +50,7 @@ void SpeedEstimation::drawOnCVImage(cv::Mat &image,const rs2_intrinsics *intrins
             for(std::string& line : generateTextLabels(object))
             {
 
-                cv::putText(image,line,cv::Point{x,y},CV_FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar{255,255,0},1);
+                cv::putText(image,line,cv::Point{x,y},cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar{255,255,0},1);
                 y += dy;
             }
 

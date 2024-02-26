@@ -14,7 +14,7 @@ else()
 endif()
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED )
-find_package(depthai CONFIG REQUIRED)
+#find_package(depthai CONFIG REQUIRED)
 
 #find_package(depthai CONFIG REQUIRED)
 #find_package(OpenGL REQUIRED)
@@ -38,11 +38,11 @@ link_directories(${Open3D_LIBRARY_DIRS})
 
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-add_executable(${TARGET_NAME} main.cpp src/utility.cpp src/utility.hpp src/Processing.cpp src/Processing.h src/DepthAiCamera.cpp src/DepthAiCamera.h)
+add_executable(${TARGET_NAME} main.cpp src/TrackingObject.cpp src/TrackingObject.h src/Sample.h src/SampleGrid.cpp src/SampleGrid.h src/constants.h src/SpeedEstimation.cpp src/SpeedEstimation.h src/RealSenseCamera.cpp src/RealSenseCamera.h src/Grid.cpp src/Grid.h src/ObjectAssignment.h src/Transform3D.h src/Grid.h src/Grid.cpp src/DataGrid.h src/SpeedEstimationUtil.cpp src/Benchmark.cpp src/Benchmark.h src/helper.h)
 
-target_link_libraries(${TARGET_NAME} PRIVATE depthai::opencv)
+#target_link_libraries(${TARGET_NAME} PRIVATE depthai::opencv)
 
-target_link_libraries(${TARGET_NAME} PRIVATE glfw ${OpenCV_LIBS} ${Open3D_LIBRARIES})
+target_link_libraries(${TARGET_NAME} PRIVATE glfw ${OpenCV_LIBS} ${realsense2_LIBRARY} ${Open3D_LIBRARIES})
 target_include_directories(${TARGET_NAME} PUBLIC ${Open3D_INCLUDE_DIRS})
 
 
